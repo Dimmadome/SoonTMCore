@@ -1,0 +1,17 @@
+main: com.github.kraftykaleb.Main
+version: 1.0
+author: Kraft
+name: SoonTMCore
+description: Skyflag minigame plugin!
+commands:
+  warp:
+    description: Sends a player to a server
+  hub:
+    description: Warps you to the hub!
+  statussigns:
+    descripton: Set the sign!
+
+permissions:
+  soontmcore.warp:
+    description: Allows you to Warp a player to a server
+    default: op
