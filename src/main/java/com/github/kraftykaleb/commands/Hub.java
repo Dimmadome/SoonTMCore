@@ -10,6 +10,10 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
 /**
  * Created by Kraft on 4/19/2017.
  */
@@ -23,15 +27,23 @@ public class Hub implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        ByteArrayDataOutput out = ByteStreams.newDataOutput();
+        //ByteArrayDataOutput out = ByteStreams.newDataOutput();
         if (sender instanceof Player) {
             Player p = (Player) sender;
             try {
-                out.writeUTF("ConnectOther");
-                out.writeUTF(p.getName());
-                out.writeUTF("lobby1");
+                ByteArrayOutputStream b = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(b);
 
-                Bukkit.getServer().sendPluginMessage(plugin, "BungeeCord", out.toByteArray());
+                try {
+                    out.writeUTF("Connect");
+                    out.writeUTF("lobby1");
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                //out.writeUTF(e.getPlayer().getName());
+
+
+                p.sendPluginMessage(Main.get(), "BungeeCord", b.toByteArray());
                 p.sendMessage(ChatColor.GREEN + "Sending you to lobby1...");
             } catch (Exception e) {
                 e.printStackTrace();

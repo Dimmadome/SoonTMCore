@@ -9,6 +9,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -23,32 +26,33 @@ public class Warp implements CommandExecutor {
     }
 
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        ByteArrayDataOutput out = ByteStreams.newDataOutput();
+
 
         if (sender.hasPermission("soontmcore.warp")) {
             if (args.length == 2) {
-                if (plugin.serverList == null) {
-                    Bukkit.getServer().broadcastMessage("FETCHING SERVER LIST...");
-                    try {
-                        out.writeUTF("GetServers");
-                        Bukkit.getServer().sendPluginMessage(plugin, "BungeeCord", out.toByteArray());
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                } else if (Arrays.asList(plugin.serverList).contains(args[1])) {
+                if (Arrays.asList(plugin.serverList).contains(args[1])) {
                     if (Bukkit.getServer().getPlayer(args[0]) != null) {
                         try {
-                            out.writeUTF("ConnectOther");
-                            out.writeUTF(args[0]);
-                            out.writeUTF(args[1]);
+                            ByteArrayOutputStream b = new ByteArrayOutputStream();
+                            DataOutputStream out = new DataOutputStream(b);
+                            try {
+                                out.writeUTF("Connect");
+                                out.writeUTF(args[1].toLowerCase());
+                            } catch (IOException e1) {
+                                e1.printStackTrace();
+                            }
+                            //out.writeUTF(e.getPlayer().getName());
 
-                            Bukkit.getServer().sendPluginMessage(plugin, "BungeeCord", out.toByteArray());
+
+                            Bukkit.getServer().getPlayer(args[0]).sendPluginMessage(Main.get(), "BungeeCord", b.toByteArray());
+                            Bukkit.getServer().getPlayer(args[0]).sendMessage(ChatColor.GREEN + "Sending you to " + args[1].toLowerCase() + "...");
+
                             sender.sendMessage(ChatColor.GREEN + "Successfully sent " + Bukkit.getServer().getPlayer(args[0]).getCustomName() + ChatColor.GREEN + " to " + args[1].toLowerCase());
                             return true;
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
+
                     } else {
                         sender.sendMessage(ChatColor.RED + "That player is not online!");
                         return true;

@@ -8,6 +8,11 @@ import com.github.kraftykaleb.listeners.onBreak;
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
+import com.mojang.authlib.GameProfile;
+import net.minecraft.server.v1_8_R3.EntityPlayer;
+import net.minecraft.server.v1_8_R3.MinecraftServer;
+import net.minecraft.server.v1_8_R3.PlayerInteractManager;
+import net.minecraft.server.v1_8_R3.WorldServer;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -15,6 +20,11 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.craftbukkit.v1_8_R3.CraftServer;
+import org.bukkit.craftbukkit.v1_8_R3.CraftWorld;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -22,11 +32,15 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scoreboard.NameTagVisibility;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.InputStream;
+import java.io.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.sql.*;
@@ -42,47 +56,68 @@ import java.util.logging.Level;
 public class Main extends JavaPlugin implements PluginMessageListener, Listener {
 
     public String[] serverList = null;
-    public Set<StatusSign> signs;
+    //public Set<StatusSign> signs;
     public Connection connection;
+    public Integer queue;
+    private static Main instance;
+
 
     public HashMap<String, Integer> skyflagwins = new HashMap<>();
     public HashMap<String, Integer> skyflagkills = new HashMap<>();
     public HashMap<String, Integer> skyflagcoins = new HashMap<>();
     public HashMap<String, String> assignedguilds = new HashMap<>();
     public HashMap<String, String> guildranks = new HashMap<>();
-    public HashMap<String, String> hypixelranks = new HashMap<>();
     public HashMap<String, String> donationrank = new HashMap<>();
+    public HashMap<String, EntityPlayer> npclist = new HashMap<>();
 
     public void onEnable() {
+
+
+        //ScoreboardManager manager = Bukkit.getScoreboardManager();
+        //Scoreboard scoreboard = manager.getNewScoreboard();
+
+        //Team team = scoreboard.registerNewTeam("NPC");
+        //team.addPlayer((npc.getBukkitEntity()));
+        //team.setNameTagVisibility(NameTagVisibility.NEVER);
+        for (Entity e : Bukkit.getServer().getWorld("world").getEntities()) {
+            e.remove();
+        }
+
         Bukkit.getServer().getMessenger().registerIncomingPluginChannel(this, "BungeeCord", this);
         Bukkit.getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
 
-        this.signs = new HashSet<>();
+        queue = 0;
+
+        //this.signs = new HashSet<>();
 
         PluginManager pm = Bukkit.getServer().getPluginManager();
 
-        pm.registerEvents(new OnInteract(this), this);
+        //pm.registerEvents(new OnInteract(this), this);
         pm.registerEvents(this, this);
-        pm.registerEvents(new onBreak(this), this);
+        //pm.registerEvents(new onBreak(this), this);
         pm.registerEvents(new OnJoin(this), this);
 
         getCommand("warp").setExecutor(new Warp(this));
         getCommand("hub").setExecutor(new Hub(this));
 
 
-        ByteArrayDataOutput out = ByteStreams.newDataOutput();
-        try {
-            out.writeUTF("GetServers");
-            Bukkit.getServer().sendPluginMessage(this, "BungeeCord", out.toByteArray());
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            try {
+                ByteArrayOutputStream b = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(b);
+                out.writeUTF("GetServers");
+                Bukkit.getServer().sendPluginMessage(this.get(), "BungeeCord", b.toByteArray());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
 
 
         //Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(this, new Runnable() {
         //@Override
         // public void run() {
+        /*
         for (int i = 1; i <= getConfig().getKeys(false).size(); i++) {
             Integer in = i;
             World w = Bukkit.getServer().getWorld("world");
@@ -91,7 +126,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
             double z = getConfig().getDouble(in + ".loc.z");
             Location loc = new Location(w, x, y, z);
             Block b = loc.getBlock();
-            Bukkit.getServer().getLogger().log(Level.INFO,"#" + in + " Located a " + b.getType().toString() + " at " + getConfig().getString(in + ".loc.world") + ", " + (getConfig().getDouble(in + ".loc.x")) + ", " + getConfig().getDouble(in + ".loc.y") + ", " + (getConfig().getDouble(in + ".loc.z")));
+            Bukkit.getServer().getLogger().log(Level.INFO, "#" + in + " Located a " + b.getType().toString() + " at " + getConfig().getString(in + ".loc.world") + ", " + (getConfig().getDouble(in + ".loc.x")) + ", " + getConfig().getDouble(in + ".loc.y") + ", " + (getConfig().getDouble(in + ".loc.z")));
 
 
             if (!(b.getState() instanceof Sign)) {
@@ -116,7 +151,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
                 }
             }
         }, 0, 20);
-
+*/
         try {
             File f = new File(this.getDataFolder() + File.separator + "config.yml");
             if (f.exists()) {
@@ -135,18 +170,52 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
     }
 
     public void onDisable() {
-        try {
-            if (connection != null || connection.isClosed()) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
             }
-        } catch (SQLException e) {
+        }
+
+        saveDefaultConfig();
+    }
+
+    public synchronized void openConnection() {
+        try {
+            connection = DriverManager.getConnection("jdbc:mysql://172.106.202.99:3306/Kraft_SoonTMDatabase", "Kraft", "KraftLegos11");
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        saveDefaultConfig();
+    }
+
+    public synchronized void closeConnection() {
+        try {
+            connection.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public synchronized boolean playerDataContainsPlayer(Player player) {
+        try {
+            openConnection();
+            PreparedStatement sql = connection.prepareStatement("SELECT * FROM `player_data` WHERE player=?;");
+            sql.setString(1, player.getUniqueId().toString());
+            ResultSet resultSet = sql.executeQuery();
+
+            boolean containsPlayer = resultSet.next();
+
+            sql.close();
+            resultSet.close();
+
+            return containsPlayer;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            closeConnection();
+        }
     }
 
     @Override
@@ -154,16 +223,16 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
         if (!channel.equals("BungeeCord")) {
             return;
         }
-        Bukkit.getServer().broadcastMessage("Got some data");
         ByteArrayDataInput in = ByteStreams.newDataInput(message);
         String subchannel = in.readUTF();
         if (subchannel.equals("GetServers")) {
             serverList = in.readUTF().split(", ");
-            Bukkit.getServer().broadcastMessage("FOUND SERVERS!");
+            Bukkit.getServer().getLogger().log(Level.INFO, "FOUND BUNGEE SERVERS!");
         }
 
     }
 
+    /*
     public void refreshSign() {
         try {
             Socket socket = new Socket();
@@ -234,6 +303,7 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
         return true;
     }
 
+
     public void save(StatusSign sign) {
         sign.updateSkyFlag();
         Integer size = getConfig().getKeys(false).size() + 1;
@@ -245,58 +315,38 @@ public class Main extends JavaPlugin implements PluginMessageListener, Listener 
         getConfig().set(y, ((double) sign.getBlock().getY()));
         getConfig().set(z, ((double) sign.getBlock().getZ()));
         saveConfig();
+        return;
+    }
+    */
+
+    public static void sendToBungeeServer(final String server, final Player player) {
+        new BukkitRunnable() {
+
+            public void run() {
+                ByteArrayOutputStream b = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(b);
+
+                try {
+                    out.writeUTF("Connect");
+                    out.writeUTF(server);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return;
+                }
+
+                if (b != null) {
+                    player.sendPluginMessage(get(), "BungeeCord", b.toByteArray());
+                }
+            }
+        }.runTaskLater(get(), 20L);
     }
 
-    public synchronized void openConnection() {
-        try {
-            connection = DriverManager.getConnection("jdbc:mysql://172.106.202.99:3306/Kraft_SoonTMDatabase", "Kraft", "KraftLegos11");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public static Main get() {
+        return instance;
     }
 
-    public synchronized void closeConnection () {
-        try {
-            connection.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public synchronized boolean playerDataContainsPlayer(Player player) {
-        try {
-            PreparedStatement sql = connection.prepareStatement("SELECT * FROM `player_data` WHERE player=?;");
-            sql.setString(1, player.getUniqueId().toString());
-            ResultSet resultSet = sql.executeQuery();
-
-            boolean containsPlayer = resultSet.next();
-
-            sql.close();
-            resultSet.close();
-
-            return containsPlayer;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    public void loadSkyflagCoins (String name) {
-        UUID playerUUID = Bukkit.getServer().getPlayer(name).getUniqueId();
-
-        try {
-            PreparedStatement skyflagCoinsStatement = connection.prepareStatement("SELECT skyflag_coins FROM `player_data` WHERE player=?;");
-            skyflagCoinsStatement.setString(1, playerUUID.toString());
-
-            ResultSet resultCoinsSet = skyflagCoinsStatement.executeQuery();
-            resultCoinsSet.next();
-
-            skyflagcoins.put(name, resultCoinsSet.getInt("skyflag_coins"));
-
-            skyflagCoinsStatement.close();
-            resultCoinsSet.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public Main() {
+        instance = this;
     }
 }
+

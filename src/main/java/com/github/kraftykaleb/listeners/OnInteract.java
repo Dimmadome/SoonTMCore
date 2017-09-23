@@ -15,6 +15,9 @@ import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerInteractEvent;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,39 +31,65 @@ public class OnInteract implements Listener {
 
     private Main plugin;
 
+
     public OnInteract(Main instance) {
         plugin = instance;
     }
-    public ArrayList<String> WaitTimer = new ArrayList<>();
+    public HashMap<String, Integer> WaitTimer = new HashMap<>();
+
+
 
     @EventHandler
     public void onInteractEvent(PlayerInteractEvent e) {
+        /*
         if (e.getAction() == Action.RIGHT_CLICK_BLOCK) {
             Block b = e.getClickedBlock();
             if (b.getType() != Material.SIGN && b.getType() != Material.SIGN_POST && b.getType() != Material.WALL_SIGN)
                 return;
-            if (WaitTimer.contains(plugin.getName())) {
-                WaitTimer.add(e.getPlayer().getName());
+            for (StatusSign s : plugin.signs) {
+                if (!s.getBlock().equals(b)) {
+                    return;
+                }
+            }
+            if (!WaitTimer.containsKey(e.getPlayer().getName())) {
+                plugin.queue++;
+                e.getPlayer().sendMessage(ChatColor.GREEN + "Sending you to mini1A...");
+                e.getPlayer().sendMessage(ChatColor.GREEN + "You are #" + plugin.queue + " in line!");
+                WaitTimer.put(e.getPlayer().getName(), plugin.queue);
                 Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
                     public void run() {
                         WaitTimer.remove(e.getPlayer().getName());
+
+                        //ByteArrayDataOutput out = ByteStreams.newDataOutput();
+
+                        ByteArrayOutputStream b = new ByteArrayOutputStream();
+                        DataOutputStream out = new DataOutputStream(b);
+
+                        try {
+                            out.writeUTF("Connect");
+                            out.writeUTF("mini1A");
+                        } catch (IOException e1) {
+                            e1.printStackTrace();
+                        }
+                        //out.writeUTF(e.getPlayer().getName());
+
+
+                        e.getPlayer().sendPluginMessage(Main.get(), "BungeeCord", b.toByteArray());
+
+                        for (Integer spot : WaitTimer.values()) {
+                            spot--;
+                        }
+                        plugin.queue--;
                     }
-                }, 20L);
+
+                }, plugin.queue+5);
+
+            } else {
+                e.getPlayer().sendMessage(ChatColor.RED + "You are already queued to join this game! Stand back and wait to enter :)!");
             }
-            for (StatusSign s : plugin.signs) {
-                if (s.getBlock().equals(b)) {
-                    ByteArrayDataOutput out = ByteStreams.newDataOutput();
 
-                    out.writeUTF("ConnectOther");
-                    out.writeUTF(e.getPlayer().getName());
-                    out.writeUTF("mini1A");
-
-                    e.getPlayer().sendMessage(ChatColor.GREEN + "Sending you to mini1A...");
-
-                    Bukkit.getServer().sendPluginMessage(plugin, "BungeeCord", out.toByteArray());
-                }
-            }
         }
+        */
     }
 
     //public void onAnimate(PlayerAnimationEvent e) {

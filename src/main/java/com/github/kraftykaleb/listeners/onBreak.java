@@ -14,6 +14,7 @@ import org.bukkit.event.block.BlockBreakEvent;
  */
 public class onBreak implements Listener {
 
+    /*
     private Main plugin;
 
     public onBreak(Main instance) {
@@ -47,4 +48,5 @@ public class onBreak implements Listener {
             }
         }
     }
+    */
 }

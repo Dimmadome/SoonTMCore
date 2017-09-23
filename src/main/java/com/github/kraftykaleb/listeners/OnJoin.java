@@ -1,31 +1,35 @@
 package com.github.kraftykaleb.listeners;
 
 import com.github.kraftykaleb.Main;
-import com.github.kraftykaleb.Util;
+import com.github.kraftykaleb.PlayerList;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
 import com.mashape.unirest.http.async.Callback;
 import com.mashape.unirest.http.exceptions.UnirestException;
 import com.mashape.unirest.request.HttpRequest;
-import net.hypixel.api.HypixelAPI;
+import com.mojang.authlib.GameProfile;
 import net.hypixel.api.reply.GuildReply;
-import net.hypixel.api.reply.PlayerReply;
-import net.hypixel.api.request.Request;
-import net.hypixel.api.request.RequestBuilder;
-import net.hypixel.api.request.RequestParam;
-import net.hypixel.api.request.RequestType;
-import net.md_5.bungee.api.chat.TextComponent;
+import net.minecraft.server.v1_8_R3.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.entity.Player;
+import org.bukkit.Location;
+import org.bukkit.craftbukkit.v1_8_R3.CraftServer;
+import org.bukkit.craftbukkit.v1_8_R3.CraftWorld;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
+import org.bukkit.entity.*;
+import org.bukkit.entity.Entity;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.json.JSONObject;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -35,86 +39,116 @@ import java.util.logging.Level;
  */
 public class OnJoin implements Listener {
 
-    public HashMap<String, GuildReply.Guild.Member> guilds = new HashMap<>();
-    public HashMap<String, String> hypixelranks = new HashMap<>();
-    private Main plugin;
-    public OnJoin(Main instance) { plugin = instance; }
 
+    public HashMap<String, String> hypixelranks = new HashMap<>();
+    public HashMap<String, String> plusColorList = new HashMap<>();
+    private Main plugin;
+
+    public OnJoin(Main instance) { plugin = instance; }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
+
         Player p = e.getPlayer();
-        findHypixelPlayer(e.getPlayer());
+        findHypixelPlayer(p);
 
-        Bukkit.getServer().getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
-            public void run() {
-                plugin.openConnection();
-                try {
-                    if (plugin.playerDataContainsPlayer(e.getPlayer())) {
-                        PreparedStatement skyflagwins = plugin.connection.prepareStatement("SELECT skyflag_wins FROM `player_data` WHERE player=?;");
-                        skyflagwins.setString(1, e.getPlayer().getUniqueId().toString());
 
-                        ResultSet resultWinsSet = skyflagwins.executeQuery();
-                        resultWinsSet.next();
 
-                        plugin.skyflagwins.put(p.getName(), resultWinsSet.getInt("skyflag_wins"));
+    }
 
-                        PreparedStatement skyflagkills = plugin.connection.prepareStatement("SELECT skyflag_kills FROM `player_data` WHERE player=?;");
-                        skyflagkills.setString(1, e.getPlayer().getUniqueId().toString());
+    /*private static PacketPlayOutPlayerInfo setInfo(PacketPlayOutPlayerInfo packet, PacketPlayOutPlayerInfo.EnumPlayerInfoAction action, PacketPlayOutPlayerInfo.PlayerInfoData data) {
+        try {
+            actionField.set(packet, action);
+            dataField.set(packet, Arrays.asList(data));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return packet;
+    }
 
-                        ResultSet resultKillsSet = skyflagkills.executeQuery();
-                        resultKillsSet.next();
+    private static Field getField(Class<?> clazz, String name) {
+        try {
+            Field field = clazz.getDeclaredField(name);
+            field.setAccessible(true);
 
-                        plugin.skyflagkills.put(p.getName(), resultKillsSet.getInt("skyflag_kills"));
-
-                        plugin.loadSkyflagCoins(p.getName());
-
-                        skyflagkills.close();
-                        skyflagwins.close();
-                        resultKillsSet.close();
-                        resultWinsSet.close();
-                        Bukkit.getServer().getLogger().log(Level.INFO, p.getName() + " was found and now has " + plugin.skyflagwins.get(p.getName())+ " wins!");
-                    } else {
-
-                        p.kickPlayer(ChatColor.RED + "an SQL error occured, Please report this to a developer! \nSQLPLAYERNOTFOUND AT: " + Thread.currentThread().getStackTrace()[2].getClassName() + "(" + Thread.currentThread().getStackTrace()[2].getMethodName() + "(" +Thread.currentThread().getStackTrace()[2].getLineNumber()+"))");
-                        //Bukkit.getServer().broadcast(ChatColor.R + "[BOT] SoonTM: " + net.md_5.bungee.api.ChatColor.YELLOW + "Please welcome " + p.getDisplayName() + net.md_5.bungee.api.ChatColor.YELLOW + " to the server!"));
-                        //ProxyServer.getInstance().getLogger().log(Level.INFO, "Created a new player on the database!");
-                    }
-                } catch (Exception error) {
-                    error.printStackTrace();
-                } finally {
-                    plugin.closeConnection();
-                }
+            if (Modifier.isFinal(field.getModifiers())) {
+                modifiers.set(field, field.getModifiers() & ~Modifier.FINAL);
             }
-        }, 20);
+
+            return field;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }*/
+
+
+    private void findHypixelPlayer(final Player hypixelPlayer) {
+        try {
+            if (plugin.playerDataContainsPlayer(hypixelPlayer)) {
+                plugin.openConnection();
+                PreparedStatement rank = plugin.connection.prepareStatement("SELECT rank FROM `player_data` WHERE player=?;");
+                rank.setString(1, hypixelPlayer.getUniqueId().toString());
+
+
+                ResultSet resultRank = rank.executeQuery();
+                resultRank.next();
+
+                hypixelranks.put(hypixelPlayer.getName(), resultRank.getString("rank"));
+
+                PreparedStatement plusColorCheck = plugin.connection.prepareStatement("SELECT plus_color FROM `player_data` WHERE player=?;");
+                plusColorCheck.setString(1, hypixelPlayer.getUniqueId().toString());
+
+
+                ResultSet resultPlusColorCheck = plusColorCheck.executeQuery();
+                resultPlusColorCheck.next();
+
+                plusColorList.put(hypixelPlayer.getName(), resultPlusColorCheck.getString("plus_color"));
+
+
+                plusColorCheck.close();
+                resultPlusColorCheck.close();
+                rank.close();
+                resultRank.close();
+            } else {
+                //hypixelPlayer.kickPlayer(ChatColor.RED + "An SQL error occured, Please report this to a developer! \nSQLPLAYERNOTFOUND AT: " + Thread.currentThread().getStackTrace()[2].getClassName() + "(" + Thread.currentThread().getStackTrace()[2].getMethodName() + "(" + Thread.currentThread().getStackTrace()[2].getLineNumber() + "))");
+            }
+        }
+        catch (Exception error) {
+            error.printStackTrace();
+        } finally {
+            plugin.closeConnection();
+        }
+
+
+
+
+            String prefix = getRankPrefix(hypixelPlayer);
+            String prefixColor = getRankColor(hypixelPlayer);
+            String rank = hypixelranks.get(hypixelPlayer.getName());
+
+
+            if (rank.equals("MVP_PLUS") && !plusColorList.get(hypixelPlayer.getName()).equals("NONE")) {
+                String mvpPrefix = ChatColor.AQUA + "[MVP" + ChatColor.valueOf(plusColorList.get(hypixelPlayer.getName())) + "+" + ChatColor.AQUA + "] ";
+                hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                hypixelPlayer.setCustomName(mvpPrefix + hypixelPlayer.getName());
+                hypixelPlayer.setPlayerListName(mvpPrefix + hypixelPlayer.getName());
+            } else {
+                hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                return;
+            }
+
 
     }
-    public void findHypixelGuild(Player p, String id) {
-            HypixelAPI.getInstance().setApiKey(UUID.fromString("94512d8c-d83c-46b4-a789-a11347fff344"));
 
-            Request request = RequestBuilder.newBuilder(RequestType.GUILD)
-                    .addParam(RequestParam.GUILD_BY_ID, id)
-                    .createRequest();
-            HypixelAPI.getInstance().getAsync(request, (net.hypixel.api.util.Callback<GuildReply>) (failCause, result) -> {
-                if (failCause != null) {
-                    failCause.printStackTrace();
-                } else {
-                    if (result.getGuild().getName().toUpperCase().equals("SOONTM")) {
-                        for (GuildReply.Guild.Member member : result.getGuild().getMembers()) {
-                            if (member.getUuid().equals(p.getUniqueId())) {
-                                //If they are a member of SoonTM, run this.
-                            }
-                        }
-                    }
-                }
-                HypixelAPI.getInstance().finish();
-            });
+    /*private void findHypixelPlayer(final Player hypixelPlayer) {
 
-    }
 
-    public void findHypixelPlayer(final Player hypixelPlayer) {
+
         HttpRequest request = Unirest.get("https://api.hypixel.net/player")
-                .queryString("key", "94512d8c-d83c-46b4-a789-a11347fff344")
+                .queryString("key", "811f839c-b801-48e0-a693-a857e48261a0")
                 .queryString("uuid", hypixelPlayer.getUniqueId().toString());
 
         request.asJsonAsync(new Callback<JsonNode>() {
@@ -130,103 +164,92 @@ public class OnJoin implements Listener {
 
                 Bukkit.getLogger().log(Level.INFO, "Found player " + hypixelPlayer.getName());
 
-                net.md_5.bungee.api.ChatColor plusColor = null;
-                String prefix = null;
+                ChatColor plusColor;
 
 
                 if (apiResponse.has("rank")) {
 
-                    String hypixelRank = (apiResponse.has("rank") ? apiResponse.getString("rank") : "NONE");
+                    String hypixelRank = apiResponse.getString("rank");//(apiResponse.has("rank") ? apiResponse.getString("rank") : "NONE");
                     hypixelranks.put(hypixelPlayer.getName(), hypixelRank);
-                    if (hypixelRank.equals("ADMIN")) {
-                        hypixelPlayer.setDisplayName((net.md_5.bungee.api.ChatColor.RED + "[ADMIN] " + hypixelPlayer.getName()));
-                    }
-                    if (hypixelRank.equals("MODERATOR")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.DARK_GREEN + "[MOD] " + hypixelPlayer.getName());
-                    }
-                    if (hypixelRank.equals("HELPER")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.BLUE + "[HELPER] " + hypixelPlayer.getName());
-                    }
-                    if (hypixelRank.equals("MVP")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP] " + hypixelPlayer.getName());
-                    }
-                    if (hypixelRank.equals("VIP")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GREEN + "[VIP] " + hypixelPlayer.getName());
-                    }
-                    if (hypixelRank.equals("VIP_PLUS")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GREEN + "[VIP" + net.md_5.bungee.api.ChatColor.GOLD + "+" + net.md_5.bungee.api.ChatColor.GREEN + "] " + hypixelPlayer.getName());
-                    }
+                    String prefix = getRankPrefix(hypixelPlayer);
+                    String prefixColor = getRankColor(hypixelPlayer);
+
+
                     if (apiResponse.getString("rank").equals("MVP_PLUS")) {
                         if (apiResponse.has("rankPlusColor")) {
-                            plusColor = net.md_5.bungee.api.ChatColor.valueOf(apiResponse.getString("rankPlusColor"));
-                            hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP" + plusColor + "+" + net.md_5.bungee.api.ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            plusColor = ChatColor.valueOf(apiResponse.getString("rankPlusColor"));
+                            hypixelPlayer.setCustomName(ChatColor.AQUA + "[MVP" + plusColor + "+" + ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            hypixelPlayer.setDisplayName(ChatColor.AQUA + hypixelPlayer.getName());
+                            hypixelPlayer.setPlayerListName(ChatColor.AQUA + "[MVP" + plusColor + "+" + ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            return;
                         } else {
-                            hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP" + net.md_5.bungee.api.ChatColor.RED + "+" + net.md_5.bungee.api.ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                            hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                            hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                            return;
                         }
+                    } else {
+                        hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                        hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                        hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                        return;
                     }
                 } else if (apiResponse.has("packageRank")) {
-                    String oldPackageRank = (apiResponse.has("packageRank") ? apiResponse.getString("packageRank") : "DEFAULT");
+                    String oldPackageRank = apiResponse.getString("packageRank");
                     hypixelranks.put(hypixelPlayer.getName(), oldPackageRank);
-                    if (oldPackageRank.equals("ADMIN")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.RED + "[ADMIN] " + hypixelPlayer.getName());
-                    }
-                    if (oldPackageRank.equals("MODERATOR")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.DARK_GREEN + "[MOD] " + hypixelPlayer.getName());
-                    }
-                    if (oldPackageRank.equals("HELPER")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.BLUE + "[HELPER] " + hypixelPlayer.getName());
-                    }
-                    if (oldPackageRank.equals("MVP")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP] " + hypixelPlayer.getName());
-                    }
-                    if (oldPackageRank.equals("VIP")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GREEN + "[VIP] " + hypixelPlayer.getName());
-                    }
-                    if (oldPackageRank.equals("VIP_PLUS")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GREEN + "[VIP" + net.md_5.bungee.api.ChatColor.GOLD + "+" + net.md_5.bungee.api.ChatColor.GREEN + "] " + hypixelPlayer.getName());
-                    }
+                    String prefix = getRankPrefix(hypixelPlayer);
+                    String prefixColor = getRankColor(hypixelPlayer);
                     if (apiResponse.getString("packageRank").equals("MVP_PLUS")) {
                         if (apiResponse.has("rankPlusColor")) {
-                            plusColor = net.md_5.bungee.api.ChatColor.valueOf(apiResponse.getString("rankPlusColor"));
-                            hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP" + plusColor + "+" + net.md_5.bungee.api.ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            plusColor = ChatColor.valueOf(apiResponse.getString("rankPlusColor"));
+                            hypixelPlayer.setCustomName(ChatColor.AQUA + "[MVP" + plusColor + "+" + ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            hypixelPlayer.setDisplayName(ChatColor.AQUA + hypixelPlayer.getName());
+                            hypixelPlayer.setPlayerListName(ChatColor.AQUA + "[MVP" + plusColor + "+" + ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            return;
                         } else {
-                            hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP" + net.md_5.bungee.api.ChatColor.RED + "+" + net.md_5.bungee.api.ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                            hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                            hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                            return;
                         }
+                    } else {
+                        hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                        hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                        hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                        return;
                     }
                 } else if (apiResponse.has("newPackageRank")) {
 
-                    String newPackageRank = (apiResponse.has("newPackageRank") ? apiResponse.getString("newPackageRank") : "DEFAULT");
+                    String newPackageRank = apiResponse.getString("newPackageRank");
                     hypixelranks.put(hypixelPlayer.getName(), newPackageRank);
-                    if (newPackageRank.equals("ADMIN")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.RED + "[ADMIN] " + hypixelPlayer.getName());
-                    }
-                    if (newPackageRank.equals("MODERATOR")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.DARK_GREEN + "[MOD] " + hypixelPlayer.getName());
-                    }
-                    if (newPackageRank.equals("HELPER")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.BLUE + "[HELPER] " + hypixelPlayer.getName());
-                    }
-                    if (newPackageRank.equals("MVP")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP] " + hypixelPlayer.getName());
-                    }
-                    if (newPackageRank.equals("VIP")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GREEN + "[VIP] " + hypixelPlayer.getName());
-                    }
-                    if (newPackageRank.equals("VIP_PLUS")) {
-                        hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GREEN + "[VIP" + net.md_5.bungee.api.ChatColor.GOLD + "+" + ChatColor.GREEN + "] " + hypixelPlayer.getName());
-                    }
+                    String prefix = getRankPrefix(hypixelPlayer);
+                    String prefixColor = getRankColor(hypixelPlayer);
+
                     if (apiResponse.getString("newPackageRank").equals("MVP_PLUS")) {
                         if (apiResponse.has("rankPlusColor")) {
-                            plusColor = net.md_5.bungee.api.ChatColor.valueOf(apiResponse.getString("rankPlusColor"));
-                            hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP" + plusColor + "+" + net.md_5.bungee.api.ChatColor.AQUA + "] " + hypixelPlayer.getName());
-
+                            plusColor = ChatColor.valueOf(apiResponse.getString("rankPlusColor"));
+                            hypixelPlayer.setCustomName(ChatColor.AQUA + "[MVP" + plusColor + "+" + ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            hypixelPlayer.setDisplayName(ChatColor.AQUA + hypixelPlayer.getName());
+                            hypixelPlayer.setPlayerListName(ChatColor.AQUA + "[MVP" + plusColor + "+" + ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            return;
                         } else {
-                            hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.AQUA + "[MVP" + net.md_5.bungee.api.ChatColor.RED + "+" + net.md_5.bungee.api.ChatColor.AQUA + "] " + hypixelPlayer.getName());
+                            hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                            hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                            hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                            return;
                         }
+                    } else {
+                        hypixelPlayer.setDisplayName(prefixColor + hypixelPlayer.getName());
+                        hypixelPlayer.setCustomName(prefix + hypixelPlayer.getName());
+                        hypixelPlayer.setPlayerListName(prefix + hypixelPlayer.getName());
+                        return;
                     }
                 } else {
-                    hypixelPlayer.setDisplayName(net.md_5.bungee.api.ChatColor.GRAY + hypixelPlayer.getName());
+                    hypixelPlayer.setDisplayName(ChatColor.GRAY + hypixelPlayer.getName());
+                    hypixelPlayer.setCustomName(ChatColor.GRAY + hypixelPlayer.getName());
+                    hypixelPlayer.setPlayerListName(ChatColor.GRAY + hypixelPlayer.getName());
                     hypixelranks.put(hypixelPlayer.getName(), "DEFAULT");
+                    return;
                 }
                 // Handle response some how
             }
@@ -243,5 +266,62 @@ public class OnJoin implements Listener {
         });
 
 
+    }*/
+
+
+
+    private String getRankColor(Player p) {
+        if (hypixelranks.containsKey(p.getName())) {
+            if (hypixelranks.get(p.getName()).equals("ADMIN")) {
+                return "§c";
+            } else if (hypixelranks.get(p.getName()).equals("MODERATOR")) {
+                return "§2";
+            } else if (hypixelranks.get(p.getName()).equals("HELPER")) {
+                return "§9";
+            } else if (hypixelranks.get(p.getName()).equals("MVP_PLUS")) {
+                return "§b";
+            } else if (hypixelranks.get(p.getName()).equals("MVP")) {
+                return "§b";
+            } else if (hypixelranks.get(p.getName()).equals("VIP_PLUS")) {
+                return "§a";
+            } else if (hypixelranks.get(p.getName()).equals("VIP")) {
+                return "§a";
+            } else if (hypixelranks.get(p.getName()).equals("DEFAULT")) {
+                return "§7";
+
+            } else {
+                return "§7";
+            }
+        } else {
+            return "§7";
+        }
     }
+
+    private String getRankPrefix(Player p) {
+        if (hypixelranks.containsKey(p.getName())) {
+            if (hypixelranks.get(p.getName()).equals("ADMIN")) {
+                return "§c[ADMIN] ";
+            } else if (hypixelranks.get(p.getName()).equals("MODERATOR")) {
+                return "§2[MOD] ";
+            } else if (hypixelranks.get(p.getName()).equals("HELPER")) {
+                return "§9[HELPER] ";
+            } else if (hypixelranks.get(p.getName()).equals("MVP_PLUS")) {
+                return "§b[MVP§c+§b] ";
+            } else if (hypixelranks.get(p.getName()).equals("MVP")) {
+                return "§b[MVP] ";
+            } else if (hypixelranks.get(p.getName()).equals("VIP_PLUS")) {
+                return "§a[VIP§6+§a] ";
+            } else if (hypixelranks.get(p.getName()).equals("VIP")) {
+                return "§a[VIP] ";
+            } else if (hypixelranks.get(p.getName()).equals("DEFAULT")) {
+                return "§7";
+
+            } else {
+                return "§7";
+            }
+        } else {
+            return "§7";
+        }
+    }
+
 }
